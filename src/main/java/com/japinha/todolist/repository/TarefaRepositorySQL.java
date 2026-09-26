@@ -13,11 +13,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class TarefaRepositorySQL implements TarefaRepository{
+public class TarefaRepositorySQL implements TarefaRepository {
 
     private final Connection conn;
 
-    public TarefaRepositorySQL(){
+    public TarefaRepositorySQL() {
         conn = Banco.conexao();
     }
 
@@ -27,6 +27,55 @@ public class TarefaRepositorySQL implements TarefaRepository{
             return inserir(tarefa);
         }
         return atualizar(tarefa);
+    }
+
+    @Override
+    public List<Tarefa> listarTodas() {
+        String sql = """
+                SELECT * FROM tarefas
+                """;
+
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+
+            ResultSet lista = statement.executeQuery();
+            List<Tarefa> listaDados = new ArrayList<>();
+
+            while (lista.next()) {
+                listaDados.add(dadoTarefa(lista)
+                );
+            }
+            return listaDados;
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public Optional<Tarefa> buscarPorId(Long id) {
+        if (id == null) {
+            throw new ValidacaoException("Nao tem id");
+        }
+        return sqlBuscaPorId(id);
+    }
+
+    @Override
+    public void deletar(Long id) {
+        String sql = """
+                DELETE FROM tarefas
+                WHERE id = ?
+                """;
+        if (id == null) {
+            throw new IllegalArgumentException("nao tem id");
+        }
+
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            statement.setLong(1, id);
+            statement.executeUpdate();
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private Tarefa inserir(Tarefa tarefa) {
@@ -87,13 +136,6 @@ public class TarefaRepositorySQL implements TarefaRepository{
         statement.setString(7, tarefa.getDataConcluido() != null ? tarefa.getDataConcluido().toString() : null);
     }
 
-    @Override
-    public Optional<Tarefa> buscarPorId(Long id) {
-        if(id == null){
-            throw new ValidacaoException("Nao tem id");
-        }
-            return sqlBuscaPorId(id);
-    }
 
     private Optional<Tarefa> sqlBuscaPorId(Long id) {
         String sql = """
@@ -101,78 +143,31 @@ public class TarefaRepositorySQL implements TarefaRepository{
                 WHERE id = ?
                 """;
 
-        try(PreparedStatement statement = conn.prepareStatement(sql)){
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
             statement.setLong(1, id);
             ResultSet dados = statement.executeQuery();
 
-            if(dados.next()){
-                return Optional.of(new Tarefa(dados.getLong(1),
-                        dados.getString("titulo"),
-                        dados.getString(3),
-                        StatusTarefa.valueOf( dados.getString(4)),
-                        StatusPrioridade.valueOf(dados.getString(5)),
-                        Categoria.valueOf(dados.getString(6)),
-                        LocalDate.parse(dados.getString(7)),
-                        dados.getString(8) != null ? LocalDate.parse(dados.getString(8)) : null
-                        )
+            if (dados.next()) {
+                return Optional.of(dadoTarefa(dados)
                 );
-            }
-            else {
+            } else {
                 return Optional.empty();
             }
-
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-
     }
 
-    @Override
-    public List<Tarefa> listarTodas() {
-        String sql = """
-                SELECT * FROM tarefas
-                """;
-
-        try(PreparedStatement statement = conn.prepareStatement(sql)){
-
-            ResultSet lista = statement.executeQuery();
-            List<Tarefa> listaDados = new ArrayList<>();
-
-            while(lista.next()){
-                listaDados.add(new Tarefa(lista.getLong(1),
-                        lista.getString("titulo"),
-                        lista.getString(3),
-                        StatusTarefa.valueOf( lista.getString(4)),
-                        StatusPrioridade.valueOf(lista.getString(5)),
-                        Categoria.valueOf(lista.getString(6)),
-                        LocalDate.parse(lista.getString(7)),
-                        lista.getString(8) != null ? LocalDate.parse(lista.getString(8)) : null
-                )
+    private Tarefa dadoTarefa(ResultSet rs) throws SQLException {
+        return new Tarefa(rs.getLong(1),
+                rs.getString(2),
+                rs.getString(3),
+                StatusTarefa.valueOf(rs.getString(4)),
+                StatusPrioridade.valueOf(rs.getString(5)),
+                Categoria.valueOf(rs.getString(6)),
+                LocalDate.parse(rs.getString(7)),
+                LocalDate.parse(rs.getString(8))
                 );
-            }
-            return listaDados;
-
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
     }
 
-    @Override
-    public void deletar(Long id) {
-        String sql = """
-                DELETE FROM tarefas
-                WHERE id = ?
-                """;
-        if(id == null){
-            throw new IllegalArgumentException("nao tem id");
-        }
-
-        try(PreparedStatement statement = conn.prepareStatement(sql)){
-            statement.setLong(1,id);
-            statement.executeUpdate();
-
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
 }
